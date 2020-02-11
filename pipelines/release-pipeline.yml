@@ -7,6 +7,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     jobs:
     - job: build_and_test
+      displayName: 'Build and Test Source'
       steps:
       - template: .\build-and-test-template.yml
 
@@ -59,7 +60,6 @@ stages:
 
       - publish: $(Build.SourcesDirectory)/dist/
         displayName: 'Staging artifact for signing'
-        
 
     - job: packageLinux
       displayName: "Package for Linux"
@@ -90,6 +90,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     jobs:
     - job: sign
+      displayName: 'CodeSign Packages'
       steps:
       - task: DownloadPipelineArtifact@2
         displayName: 'Stage artifacts for signing'
@@ -98,7 +99,7 @@ stages:
           targetPath: '$(Pipeline.Workspace)/staging'
 
       - task: EsrpCodeSigning@1
-        displayName: 'signWindows'
+        displayName: 'Sign Windows MSI package'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
           FolderPath: '$(Pipeline.Workspace)/staging'
@@ -135,7 +136,7 @@ stages:
           VerboseLogin: false
 
       - task: EsrpCodeSigning@1
-        displayName: 'signMac_harden'
+        displayName: 'Sign MacOS DMG - Hardened'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
           FolderPath: '$(Pipeline.Workspace)/staging'
@@ -157,7 +158,7 @@ stages:
           VerboseLogin: false
 
       - task: EsrpCodeSigning@1
-        displayName: 'signMac_notarize'
+        displayName: 'Sign MacOS DMG - Notarized'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
           FolderPath: '$(Pipeline.Workspace)/staging'
@@ -179,7 +180,7 @@ stages:
           VerboseLogin: false
 
       - task: EsrpCodeSigning@1
-        displayName: 'signLinux'
+        displayName: 'Sign Linux DEB package'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
           FolderPath: '$(Pipeline.Workspace)/staging'
@@ -205,18 +206,22 @@ stages:
         inputs:
           SourceFolder: '$(Pipeline.Workspace)/staging'
           Contents: |
-            '*.deb'
-            '*.dmg'
-            '*.msi'
+            '**\*.deb'
+            '**\*.dmg'
+            '**\*.msi'
           FlattenFolders: true
           TargetFolder: '$(Pipeline.Workspace)/release/'
 
+    - job: release
+      displayName: 'Publish artifacts and draft GitHub Release'
+      steps:
       - task: PublishPipelineArtifact@1
         displayName: 'Publish signed artifacts'
         inputs:
           targetPath: '$(Pipeline.Workspace)/release/'
 
       - task: GitHubRelease@1
+        displayName: 'Draft Github release (if tagged)'
         inputs:
           gitHubConnection: 'Azure IoT Explorer Github Service Connection'
           repositoryName: '$(Build.Repository.Name)'
