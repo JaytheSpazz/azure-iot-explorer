@@ -125,7 +125,7 @@ jobs:
         SessionTimeout: '60'
         MaxConcurrency: '50'
         MaxRetryAttempts: '5'
-        VerboseLogin: true
+        VerboseLogin: false
 
     - task: EsrpCodeSigning@1
       displayName: 'signMac'
@@ -147,7 +147,7 @@ jobs:
         SessionTimeout: '60'
         MaxConcurrency: '50'
         MaxRetryAttempts: '5'
-        VerboseLogin: true
+        VerboseLogin: false
 
     - task: EsrpCodeSigning@1
       displayName: 'signLinux'
@@ -169,7 +169,7 @@ jobs:
         SessionTimeout: '60'
         MaxConcurrency: '50'
         MaxRetryAttempts: '5'
-        VerboseLogin: true
+        VerboseLogin: false
 
     - task: CopyFiles@2
       displayName: 'Flatten signed artifact files for publish'
@@ -196,3 +196,4 @@ jobs:
         assetUploadMode: 'replace'
         changeLogCompareToRelease: 'lastFullRelease'
         changeLogType: 'commitBased'
+        assets: '$(Pipeline.Workspace)/release/*'
