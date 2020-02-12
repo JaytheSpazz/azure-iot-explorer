@@ -214,6 +214,7 @@ stages:
 
     - job: release
       displayName: 'Publish artifacts and draft GitHub Release'
+      dependsOn: 'sign'
       steps:
       - task: PublishPipelineArtifact@1
         displayName: 'Publish signed artifacts'
