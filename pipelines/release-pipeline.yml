@@ -206,9 +206,9 @@ stages:
         inputs:
           SourceFolder: '$(Pipeline.Workspace)/staging'
           Contents: |
-            '**\*.deb'
-            '**\*.dmg'
-            '**\*.msi'
+            '**/*.deb'
+            '**/*.dmg'
+            '**/*.msi'
           FlattenFolders: true
           TargetFolder: '$(Pipeline.Workspace)/release/'
 
