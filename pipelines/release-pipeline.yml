@@ -37,6 +37,7 @@ stages:
 
       - publish: $(Build.SourcesDirectory)/dist/
         displayName: 'Staging artifact for signing'
+        artifact: Windows
 
     - job: packageMac
       displayName: "Package for MacOS"
@@ -60,6 +61,7 @@ stages:
 
       - publish: $(Build.SourcesDirectory)/dist/
         displayName: 'Staging artifact for signing'
+        artifact: Mac
 
     - job: packageLinux
       displayName: "Package for Linux"
@@ -82,6 +84,7 @@ stages:
 
         - publish: $(Build.SourcesDirectory)/dist/
           displayName: 'Staging artifact for signing'
+          artifact: Linux
 
   - stage: 'codeSign'
     displayName: 'CodeSign and Release'
@@ -89,20 +92,18 @@ stages:
     pool:
       vmImage: 'ubuntu-16.04'
     jobs:
-    - job: sign
-      displayName: 'CodeSign Packages'
-      steps:
-      - task: DownloadPipelineArtifact@2
-        displayName: 'Stage artifacts for signing'
-        inputs:
-          buildType: 'current'
-          targetPath: '$(Pipeline.Workspace)/staging'
 
+    - job: signWindows
+      displayName: 'Windows'
+      steps:
+      - download: current
+        artifact: Windows
+      
       - task: EsrpCodeSigning@1
         displayName: 'Sign Windows MSI package'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
-          FolderPath: '$(Pipeline.Workspace)/staging'
+          FolderPath: '$(Pipeline.Workspace)'
           Pattern: '*.msi'
           signConfigType: 'inlineSignParams'
           inlineOperation: |
@@ -134,12 +135,29 @@ stages:
           MaxConcurrency: '50'
           MaxRetryAttempts: '5'
           VerboseLogin: false
+      
+      - task: CopyFiles@2
+        displayName: 'ArtifactIgnore'
+        inputs:
+          SourceFolder: $(Build.SourcesDirectory)/
+          Contents: '.artifactignore'
+          TargetFolder: $(Pipeline.Workspace)
+
+      - publish: $(Pipeline.Workspace)
+        displayName: 'Staging signed artifact for release'
+        artifact: Windows_Signed
+        
+    - job: signMac
+      displayName: 'MacOS'
+      steps:
+      - download: current
+        artifact: Mac
 
       - task: EsrpCodeSigning@1
         displayName: 'Sign MacOS DMG - Hardened'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
-          FolderPath: '$(Pipeline.Workspace)/staging'
+          FolderPath: '$(Pipeline.Workspace)'
           Pattern: '*.dmg'
           signConfigType: 'inlineSignParams'
           inlineOperation: |
@@ -161,7 +179,7 @@ stages:
         displayName: 'Sign MacOS DMG - Notarized'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
-          FolderPath: '$(Pipeline.Workspace)/staging'
+          FolderPath: '$(Pipeline.Workspace)'
           Pattern: '*.dmg'
           signConfigType: 'inlineSignParams'
           inlineOperation: |
@@ -178,12 +196,29 @@ stages:
           MaxConcurrency: '50'
           MaxRetryAttempts: '5'
           VerboseLogin: false
+    
+      - task: CopyFiles@2
+        displayName: 'ArtifactIgnore'
+        inputs:
+          SourceFolder: $(Build.SourcesDirectory)/
+          Contents: '.artifactignore'
+          TargetFolder: $(Pipeline.Workspace)
+
+      - publish: $(Pipeline.Workspace)
+        displayName: 'Staging signed artifact for release'
+        artifact: Mac_Signed
+
+    - job: signLinux
+      displayName: 'Linux'
+      steps:
+      - download: current
+        artifact: Linux
 
       - task: EsrpCodeSigning@1
         displayName: 'Sign Linux DEB package'
         inputs:
           ConnectedServiceName: 'Azure IoT Explorer CodeSign'
-          FolderPath: '$(Pipeline.Workspace)/staging'
+          FolderPath: '$(Pipeline.Workspace)'
           Pattern: '*.deb'
           signConfigType: 'inlineSignParams'
           inlineOperation: |
@@ -202,24 +237,42 @@ stages:
           VerboseLogin: false
 
       - task: CopyFiles@2
-        displayName: 'Flatten signed artifact files for publish'
+        displayName: 'ArtifactIgnore'
         inputs:
-          SourceFolder: '$(Pipeline.Workspace)/staging'
-          Contents: |
-            '**/*.deb'
-            '**/*.dmg'
-            '**/*.msi'
-          FlattenFolders: true
-          TargetFolder: '$(Pipeline.Workspace)/release/'
+          SourceFolder: $(Build.SourcesDirectory)/
+          Contents: '.artifactignore'
+          TargetFolder: $(Pipeline.Workspace)
+      
+      - publish: $(Pipeline.Workspace)
+        displayName: 'Staging signed artifact for release'
+        artifact: Linux_Signed
 
-    - job: release
+    - job: publishRelease
       displayName: 'Publish artifacts and draft GitHub Release'
-      dependsOn: 'sign'
+      dependsOn:
+      - signWindows
+      - signMac
+      - signLinux
       steps:
-      - task: PublishPipelineArtifact@1
-        displayName: 'Publish signed artifacts'
+      - download: current
+        artifact: Windows_Signed
+
+      - download: current
+        artifact: Mac_Signed
+        
+      - download: current
+        artifact: Linux_Signed
+
+      - task: CopyFiles@2
+        displayName: 'Flatten files for release'
         inputs:
-          targetPath: '$(Pipeline.Workspace)/release/'
+          SourceFolder: $(Pipeline.Workspace)
+          Contents: |
+            **/*.deb
+            **/*.msi
+            **/*.dmg
+          flattenFolders: true
+          TargetFolder: $(Pipeline.Workspace)/release
 
       - task: GitHubRelease@1
         displayName: 'Draft Github release (if tagged)'
@@ -234,4 +287,4 @@ stages:
           assetUploadMode: 'replace'
           changeLogCompareToRelease: 'lastFullRelease'
           changeLogType: 'commitBased'
-          assets: '$(Pipeline.Workspace)/release/*'
+          assets: '$(Pipeline.Workspace)/release'
